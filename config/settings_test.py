@@ -1,0 +1,15 @@
+"""
+Configuración de Django para pytest: BD en memoria y backends rápidos/locales.
+"""
+from .settings import *  # noqa: F403, F401
+
+DATABASES = {
+    "default": {
+        "ENGINE": "django.db.backends.sqlite3",
+        "NAME": ":memory:",
+    }
+}
+
+PASSWORD_HASHERS = ["django.contrib.auth.hashers.MD5PasswordHasher"]
+
+EMAIL_BACKEND = "django.core.mail.backends.locmem.EmailBackend"

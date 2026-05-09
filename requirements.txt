@@ -1,0 +1,9 @@
+Django==5.1.7
+djangorestframework==3.16.1
+PyMySQL==1.1.2
+python-dotenv==1.1.1
+dj-database-url==2.3.0
+psycopg[binary]==3.2.13
+pytest==8.3.5
+pytest-django==4.11.1
+pytest-cov==6.1.1
