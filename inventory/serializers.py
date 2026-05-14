@@ -1,4 +1,5 @@
 from django.db import transaction
+from django.utils import timezone
 from rest_framework import serializers
 
 from .category_utils import find_canonical_categoria, normalize_categoria_text
@@ -63,6 +64,26 @@ class ProductoSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError("La categoría es obligatoria.")
         canonical = find_canonical_categoria(text)
         return canonical if canonical is not None else text
+
+    def create(self, validated_data):
+        request = self.context.get("request")
+        user = request.user if request and getattr(request.user, "is_authenticated", False) else None
+        cantidad_inicial = int(validated_data.get("cantidad") or 0)
+
+        with transaction.atomic():
+            producto = super().create(validated_data)
+
+            if cantidad_inicial > 0:
+                MovimientoInventario.objects.create(
+                    producto=producto,
+                    fecha=timezone.localdate(),
+                    tipo=MovimientoInventario.Tipo.ENTRADA,
+                    cantidad=cantidad_inicial,
+                    motivo="Registro inicial de producto",
+                    registrado_por=user,
+                )
+
+        return producto
 
 
 class MovimientoInventarioSerializer(serializers.ModelSerializer):

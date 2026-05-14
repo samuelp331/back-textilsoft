@@ -65,6 +65,56 @@ def test_producto_filtros_categoria(admin_api, ubicacion):
 
 
 @pytest.mark.django_db
+def test_alta_producto_con_stock_crea_movimiento_inicial(admin_api, ubicacion):
+    """El stock al dar de alta un producto debe quedar reflejado en movimientos (reportes/kardex)."""
+    r = admin_api.post(
+        "/api/inventory/productos/",
+        {
+            "codigo": "INI-1",
+            "nombre": "Prod inicial",
+            "categoria": "Telas",
+            "ubicacion_id": ubicacion,
+            "cantidad": 42,
+            "cantidad_minima": 5,
+        },
+        format="json",
+    )
+    assert r.status_code == status.HTTP_201_CREATED, r.data
+    pid = r.data["id"]
+    assert Producto.objects.get(pk=pid).cantidad == 42
+
+    movs = MovimientoInventario.objects.filter(producto_id=pid)
+    assert movs.count() == 1
+    m = movs.get()
+    assert m.tipo == MovimientoInventario.Tipo.ENTRADA
+    assert m.cantidad == 42
+    assert m.motivo == "Registro inicial de producto"
+
+    rep = admin_api.get("/api/reports/movimientos", {"producto_id": pid})
+    assert rep.status_code == status.HTTP_200_OK
+    assert len(rep.data) >= 1
+    assert any(row["cantidad"] == 42 and row["tipo"] == "entrada" for row in rep.data)
+
+
+@pytest.mark.django_db
+def test_alta_producto_sin_stock_no_crea_movimiento(admin_api, ubicacion):
+    r = admin_api.post(
+        "/api/inventory/productos/",
+        {
+            "codigo": "INI-0",
+            "nombre": "Sin stock",
+            "categoria": "Telas",
+            "ubicacion_id": ubicacion,
+            "cantidad": 0,
+        },
+        format="json",
+    )
+    assert r.status_code == status.HTTP_201_CREATED, r.data
+    pid = r.data["id"]
+    assert MovimientoInventario.objects.filter(producto_id=pid).count() == 0
+
+
+@pytest.mark.django_db
 def test_producto_categorias_endpoint(admin_api, ubicacion):
     admin_api.post(
         "/api/inventory/productos/",
@@ -265,3 +315,57 @@ def test_ubicacion_unique_together():
 
     with pytest.raises(IntegrityError):
         Ubicacion.objects.create(pasillo="P", estante="E", seccion="S")
+
+
+@pytest.mark.django_db
+def test_import_csv_payload_frontend_equivalente_persiste_campos(admin_api):
+    """
+    La importación CSV en el frontend arma objetos y usa inventoryData.mapProductToApi
+    (POST /api/inventory/productos/). Este test reproduce ese payload para validar que los
+    datos quedan bien guardados y son coherentes al listar.
+    """
+    payloads = [
+        {
+            "codigo": "IMP-CSV-001",
+            "nombre": "Hilo polyester 40/2",
+            "categoria": "Hilos",
+            "ubicacion": None,
+            "descripcion": "Hilo para costura industrial",
+            "cantidad": 150,
+            "cantidad_minima": 0,
+            "precio": 12.5,
+            "unidad": "metro",
+            "fecha_vencimiento": None,
+            "dias_preaviso_vencimiento": 30,
+        },
+        {
+            "codigo": "IMP-CSV-002",
+            "nombre": "Tela drill algodón",
+            "categoria": "Telas",
+            "ubicacion": None,
+            "descripcion": "Rollo estándar",
+            "cantidad": 25,
+            "cantidad_minima": 0,
+            "precio": 89.99,
+            "unidad": "rollo",
+            "fecha_vencimiento": None,
+            "dias_preaviso_vencimiento": 30,
+        },
+    ]
+    for body in payloads:
+        r = admin_api.post("/api/inventory/productos/", body, format="json")
+        assert r.status_code == status.HTTP_201_CREATED, r.data
+
+    r_list = admin_api.get("/api/inventory/productos/")
+    assert r_list.status_code == status.HTTP_200_OK
+    by_code = {item["codigo"]: item for item in r_list.data}
+
+    assert by_code["IMP-CSV-001"]["nombre"] == "Hilo polyester 40/2"
+    assert by_code["IMP-CSV-001"]["categoria"] == "Hilos"
+    assert by_code["IMP-CSV-001"]["descripcion"] == "Hilo para costura industrial"
+    assert by_code["IMP-CSV-001"]["cantidad"] == 150
+    assert float(by_code["IMP-CSV-001"]["precio"]) == 12.5
+    assert by_code["IMP-CSV-001"]["unidad"] == "metro"
+
+    assert by_code["IMP-CSV-002"]["unidad"] == "rollo"
+    assert by_code["IMP-CSV-002"]["cantidad"] == 25

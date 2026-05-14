@@ -65,10 +65,15 @@ WSGI_APPLICATION = "config.wsgi.application"
 
 
 # Database
+# Supabase: en el panel → Project Settings → Database, copia la URI (PostgreSQL).
+# - Conexión directa o Session pooler (puerto 5432): suele bastar DB_CONN_MAX_AGE=600.
+# - Transaction pooler / PgBouncer (puerto 6543): pon DB_TRANSACTION_POOLER=True y,
+#   si ves errores de cursor o conexiones, DB_CONN_MAX_AGE=0.
 DATABASE_URL = os.getenv("DATABASE_URL", "").strip().strip('"').strip("'")
 USE_SQLITE = os.getenv("USE_SQLITE", "True").lower() == "true"
 DB_CONN_MAX_AGE = int(os.getenv("DB_CONN_MAX_AGE", "600"))
 DB_SSL_REQUIRE = os.getenv("DB_SSL_REQUIRE", "True").lower() == "true"
+DB_TRANSACTION_POOLER = os.getenv("DB_TRANSACTION_POOLER", "False").lower() == "true"
 
 if DATABASE_URL:
     DATABASES = {
@@ -78,6 +83,8 @@ if DATABASE_URL:
             ssl_require=DB_SSL_REQUIRE,
         )
     }
+    if DB_TRANSACTION_POOLER:
+        DATABASES["default"]["DISABLE_SERVER_SIDE_CURSORS"] = True
 elif USE_SQLITE:
     DATABASES = {
         "default": {
