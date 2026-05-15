@@ -65,44 +65,52 @@ WSGI_APPLICATION = "config.wsgi.application"
 
 
 # Database
+
+DATABASES = {
+    "default": dj_database_url.config(
+        default=os.getenv("DATABASE_URL"),
+        conn_max_age=600,
+    )
+}
+
 # Supabase: en el panel → Project Settings → Database, copia la URI (PostgreSQL).
 # - Conexión directa o Session pooler (puerto 5432): suele bastar DB_CONN_MAX_AGE=600.
 # - Transaction pooler / PgBouncer (puerto 6543): pon DB_TRANSACTION_POOLER=True y,
 #   si ves errores de cursor o conexiones, DB_CONN_MAX_AGE=0.
-DATABASE_URL = os.getenv("DATABASE_URL", "").strip().strip('"').strip("'")
-USE_SQLITE = os.getenv("USE_SQLITE", "True").lower() == "true"
-DB_CONN_MAX_AGE = int(os.getenv("DB_CONN_MAX_AGE", "600"))
-DB_SSL_REQUIRE = os.getenv("DB_SSL_REQUIRE", "True").lower() == "true"
-DB_TRANSACTION_POOLER = os.getenv("DB_TRANSACTION_POOLER", "False").lower() == "true"
+# DATABASE_URL = os.getenv("DATABASE_URL", "").strip().strip('"').strip("'")
+# USE_SQLITE = os.getenv("USE_SQLITE", "True").lower() == "true"
+# DB_CONN_MAX_AGE = int(os.getenv("DB_CONN_MAX_AGE", "600"))
+# DB_SSL_REQUIRE = os.getenv("DB_SSL_REQUIRE", "True").lower() == "true"
+# DB_TRANSACTION_POOLER = os.getenv("DB_TRANSACTION_POOLER", "False").lower() == "true"
 
-if DATABASE_URL:
-    DATABASES = {
-        "default": dj_database_url.parse(
-            DATABASE_URL,
-            conn_max_age=DB_CONN_MAX_AGE,
-            ssl_require=DB_SSL_REQUIRE,
-        )
-    }
-    if DB_TRANSACTION_POOLER:
-        DATABASES["default"]["DISABLE_SERVER_SIDE_CURSORS"] = True
-elif USE_SQLITE:
-    DATABASES = {
-        "default": {
-            "ENGINE": "django.db.backends.sqlite3",
-            "NAME": BASE_DIR / "db.sqlite3",
-        }
-    }
-else:
-    DATABASES = {
-        "default": {
-            "ENGINE": os.getenv("DB_ENGINE", "django.db.backends.postgresql"),
-            "NAME": os.getenv("DB_NAME", "postgres"),
-            "USER": os.getenv("DB_USER", "postgres"),
-            "PASSWORD": os.getenv("DB_PASSWORD", ""),
-            "HOST": os.getenv("DB_HOST", "localhost"),
-            "PORT": os.getenv("DB_PORT", "5432"),
-        }
-    }
+# if DATABASE_URL:
+#     DATABASES = {
+#         "default": dj_database_url.parse(
+#             DATABASE_URL,
+#             conn_max_age=DB_CONN_MAX_AGE,
+#             ssl_require=DB_SSL_REQUIRE,
+#         )
+#     }
+#     if DB_TRANSACTION_POOLER:
+#         DATABASES["default"]["DISABLE_SERVER_SIDE_CURSORS"] = True
+# elif USE_SQLITE:
+#     DATABASES = {
+#         "default": {
+#             "ENGINE": "django.db.backends.sqlite3",
+#             "NAME": BASE_DIR / "db.sqlite3",
+#         }
+#     }
+# else:
+#     DATABASES = {
+#         "default": {
+#             "ENGINE": os.getenv("DB_ENGINE", "django.db.backends.postgresql"),
+#             "NAME": os.getenv("DB_NAME", "postgres"),
+#             "USER": os.getenv("DB_USER", "postgres"),
+#             "PASSWORD": os.getenv("DB_PASSWORD", ""),
+#             "HOST": os.getenv("DB_HOST", "localhost"),
+#             "PORT": os.getenv("DB_PORT", "5432"),
+#         }
+#     }
 
 
 # Password validation
