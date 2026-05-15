@@ -66,12 +66,21 @@ WSGI_APPLICATION = "config.wsgi.application"
 
 # Database
 
-DATABASES = {
-    "default": dj_database_url.config(
-        default=os.getenv("DATABASE_URL"),
-        conn_max_age=600,
-    )
-}
+_DATABASE_URL = (os.getenv("DATABASE_URL") or "").strip().strip('"').strip("'")
+if _DATABASE_URL:
+    DATABASES = {
+        "default": dj_database_url.config(
+            default=_DATABASE_URL,
+            conn_max_age=600,
+        )
+    }
+else:
+    DATABASES = {
+        "default": {
+            "ENGINE": "django.db.backends.sqlite3",
+            "NAME": BASE_DIR / "db.sqlite3",
+        }
+    }
 
 # Supabase: en el panel → Project Settings → Database, copia la URI (PostgreSQL).
 # - Conexión directa o Session pooler (puerto 5432): suele bastar DB_CONN_MAX_AGE=600.
