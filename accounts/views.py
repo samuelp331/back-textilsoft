@@ -4,7 +4,6 @@ from django.conf import settings
 from django.contrib.auth import authenticate
 from django.contrib.auth.tokens import default_token_generator
 from django.core.mail import send_mail
-from django.db import IntegrityError
 from django.db.models import F
 from django.shortcuts import get_object_or_404
 from django.utils.encoding import force_bytes, force_str
@@ -26,7 +25,6 @@ from .serializers import (
     LoginSerializer,
     PasswordResetConfirmSerializer,
     RecoverAccountSerializer,
-    RegisterSerializer,
     UsuarioAdminCreateSerializer,
     UsuarioAdminListSerializer,
     UsuarioAdminUpdateSerializer,
@@ -82,41 +80,20 @@ class LoginAPIView(APIView):
 
 
 class RegisterAPIView(APIView):
+    """
+    El alta de usuarios se realiza solo desde el panel de administración (/api/admin/usuarios/).
+    Este endpoint permanece por compatibilidad pero rechaza cualquier intento de registro público.
+    """
+
     permission_classes = [AllowAny]
     authentication_classes = []
 
     def post(self, request):
-        serializer = RegisterSerializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        data = serializer.validated_data
-
-        rol_asignado, _ = Rol.objects.get_or_create(nombre=data["rol"])
-        try:
-            user = Usuario.objects.create_user(
-                email=data["email"],
-                password=data["password"],
-                nombre=data["nombre"],
-                rol=rol_asignado,
-                estado=Usuario.Estado.ACTIVO,
-            )
-        except IntegrityError:
-            return Response(
-                {"email": ["Ya existe una cuenta con este correo."]},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        if PerfilUsuario is not None:
-            perfil, _ = PerfilUsuario.objects.get_or_create(usuario=user)
-            perfil.identificacion = data.get("identificacion", "")
-            perfil.celular = data.get("celular", "")
-            cargo_txt = (data.get("cargo") or "").strip()
-            perfil.cargo = cargo_txt or user.rol.get_nombre_display()
-            perfil.direccion = data.get("direccion", "")
-            perfil.save()
-
         return Response(
-            {"detail": "Registro exitoso. Ya puedes iniciar sesion."},
-            status=status.HTTP_201_CREATED,
+            {
+                "detail": "El registro público no está disponible. Solicite una cuenta al administrador del sistema.",
+            },
+            status=status.HTTP_403_FORBIDDEN,
         )
 
 

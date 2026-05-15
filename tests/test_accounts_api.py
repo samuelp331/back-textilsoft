@@ -9,6 +9,7 @@ from rest_framework.authtoken.models import Token
 
 from accounts.models import Rol, Usuario
 from inventory.models import MovimientoInventario, Producto
+from profiles.models import PerfilUsuario
 from suppliers.models import Proveedor
 
 
@@ -35,7 +36,7 @@ def test_login_credenciales_invalidas(api_client, operario_user):
 
 
 @pytest.mark.django_db
-def test_registro_exito(api_client, db):
+def test_registro_publico_deshabilitado(api_client, db):
     payload = {
         "nombre": "Nuevo",
         "email": "nuevo@test.com",
@@ -43,12 +44,12 @@ def test_registro_exito(api_client, db):
         "rol": Rol.Tipo.OPERARIO,
     }
     resp = api_client.post("/api/register", payload, format="json")
-    assert resp.status_code == status.HTTP_201_CREATED
-    assert Usuario.objects.filter(email="nuevo@test.com").exists()
+    assert resp.status_code == status.HTTP_403_FORBIDDEN
+    assert not Usuario.objects.filter(email="nuevo@test.com").exists()
 
 
 @pytest.mark.django_db
-def test_registro_email_duplicado(api_client, operario_user):
+def test_registro_publico_rechaza_aunque_email_duplicado(api_client, operario_user):
     resp = api_client.post(
         "/api/register",
         {
@@ -59,12 +60,12 @@ def test_registro_email_duplicado(api_client, operario_user):
         },
         format="json",
     )
-    assert resp.status_code == status.HTTP_400_BAD_REQUEST
+    assert resp.status_code == status.HTTP_403_FORBIDDEN
 
 
 @pytest.mark.django_db
 @override_settings(REGISTRATION_ASSIGNABLE_ROLES=("operario",))
-def test_registro_rol_no_permitido(api_client):
+def test_registro_publico_rechaza_cualquier_rol(api_client):
     resp = api_client.post(
         "/api/register",
         {
@@ -75,7 +76,8 @@ def test_registro_rol_no_permitido(api_client):
         },
         format="json",
     )
-    assert resp.status_code == status.HTTP_400_BAD_REQUEST
+    assert resp.status_code == status.HTTP_403_FORBIDDEN
+    assert not Usuario.objects.filter(email="x@test.com").exists()
 
 
 @pytest.mark.django_db
@@ -184,12 +186,19 @@ def test_admin_usuarios_list_create_patch_delete(admin_api, admin_user, supervis
             "email": "gestion@test.com",
             "password": "secret12",
             "rol": Rol.Tipo.OPERARIO,
+            "identificacion": "CC-100",
+            "celular": "3001234567",
+            "direccion": "Calle Empresa 1",
         },
         format="json",
     )
     assert r_create.status_code == status.HTTP_201_CREATED
     u = Usuario.objects.get(email="gestion@test.com")
     assert u.rol.nombre == Rol.Tipo.OPERARIO
+    perfil = PerfilUsuario.objects.get(usuario=u)
+    assert perfil.identificacion == "CC-100"
+    assert perfil.celular == "3001234567"
+    assert perfil.direccion == "Calle Empresa 1"
 
     r_dup = admin_api.post(
         "/api/admin/usuarios/",

@@ -74,19 +74,36 @@ class RolDetailSerializer(serializers.ModelSerializer):
 
 class UsuarioAdminListSerializer(serializers.ModelSerializer):
     rol = RolDetailSerializer(read_only=True)
+    perfil = serializers.SerializerMethodField()
 
     class Meta:
         model = Usuario
-        fields = ("id", "nombre", "email", "rol", "estado")
+        fields = ("id", "nombre", "email", "rol", "estado", "perfil")
+
+    def get_perfil(self, obj):
+        if PerfilUsuario is None:
+            return None
+        try:
+            p = obj.perfil
+        except PerfilUsuario.DoesNotExist:
+            return None
+        return {
+            "identificacion": p.identificacion or "",
+            "celular": p.celular or "",
+            "direccion": p.direccion or "",
+        }
 
 
 class UsuarioAdminCreateSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True, trim_whitespace=False, min_length=6)
     rol = serializers.SlugRelatedField(slug_field="nombre", queryset=Rol.objects.all())
+    identificacion = serializers.CharField(max_length=40, required=False, allow_blank=True, default="")
+    celular = serializers.CharField(max_length=30, required=False, allow_blank=True, default="")
+    direccion = serializers.CharField(max_length=255, required=False, allow_blank=True, default="")
 
     class Meta:
         model = Usuario
-        fields = ("nombre", "email", "password", "rol")
+        fields = ("nombre", "email", "password", "rol", "identificacion", "celular", "direccion")
 
     def validate_email(self, value):
         if Usuario.objects.filter(email__iexact=value).exists():
@@ -95,6 +112,9 @@ class UsuarioAdminCreateSerializer(serializers.ModelSerializer):
 
     def create(self, validated_data):
         request = self.context["request"]
+        identificacion = (validated_data.pop("identificacion", "") or "").strip()
+        celular = (validated_data.pop("celular", "") or "").strip()
+        direccion = (validated_data.pop("direccion", "") or "").strip()
         password = validated_data.pop("password")
         rol = validated_data.pop("rol")
         try:
@@ -110,8 +130,11 @@ class UsuarioAdminCreateSerializer(serializers.ModelSerializer):
 
         if PerfilUsuario is not None:
             perfil, _ = PerfilUsuario.objects.get_or_create(usuario=user)
+            perfil.identificacion = identificacion
+            perfil.celular = celular
+            perfil.direccion = direccion
             perfil.cargo = user.rol.get_nombre_display()
-            perfil.save(update_fields=["cargo"])
+            perfil.save(update_fields=["identificacion", "celular", "direccion", "cargo"])
 
         UsuarioGestionAuditoria.objects.create(
             usuario_afectado=user,
@@ -135,10 +158,13 @@ class UsuarioAdminUpdateSerializer(serializers.ModelSerializer):
         queryset=Rol.objects.all(),
         required=False,
     )
+    identificacion = serializers.CharField(max_length=40, required=False, allow_blank=True)
+    celular = serializers.CharField(max_length=30, required=False, allow_blank=True)
+    direccion = serializers.CharField(max_length=255, required=False, allow_blank=True)
 
     class Meta:
         model = Usuario
-        fields = ("nombre", "email", "rol", "estado", "password")
+        fields = ("nombre", "email", "rol", "estado", "password", "identificacion", "celular", "direccion")
 
     def validate_email(self, value):
         qs = Usuario.objects.filter(email__iexact=value)
@@ -157,6 +183,10 @@ class UsuarioAdminUpdateSerializer(serializers.ModelSerializer):
         return attrs
 
     def update(self, instance, validated_data):
+        perfil_ident = validated_data.pop("identificacion", None)
+        perfil_cel = validated_data.pop("celular", None)
+        perfil_dir = validated_data.pop("direccion", None)
+
         password = validated_data.pop("password", None)
         if password == "":
             password = None
@@ -176,6 +206,23 @@ class UsuarioAdminUpdateSerializer(serializers.ModelSerializer):
         if password:
             instance.set_password(password)
         instance.save()
+
+        perfil_update_fields = []
+        if PerfilUsuario is not None and any(
+            x is not None for x in (perfil_ident, perfil_cel, perfil_dir)
+        ):
+            perfil, _ = PerfilUsuario.objects.get_or_create(usuario=instance)
+            if perfil_ident is not None:
+                perfil.identificacion = perfil_ident.strip()
+                perfil_update_fields.append("identificacion")
+            if perfil_cel is not None:
+                perfil.celular = perfil_cel.strip()
+                perfil_update_fields.append("celular")
+            if perfil_dir is not None:
+                perfil.direccion = perfil_dir.strip()
+                perfil_update_fields.append("direccion")
+            if perfil_update_fields:
+                perfil.save(update_fields=perfil_update_fields)
 
         if "rol" in validated_data and PerfilUsuario is not None:
             perfil, _ = PerfilUsuario.objects.get_or_create(usuario=instance)

@@ -144,8 +144,8 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 AUTH_USER_MODEL = "accounts.Usuario"
 
-# Valores de accounts.Rol.Tipo permitidos en POST /api/register (separados por comas).
-# En producción conviene limitar, por ejemplo, a "operario".
+# El registro público (POST /api/register) está deshabilitado en la vista; altas vía /api/admin/usuarios/.
+# Si en el futuro se reactiva el endpoint, estos son los roles permitidos en RegisterSerializer (separados por comas).
 REGISTRATION_ASSIGNABLE_ROLES = tuple(
     x.strip()
     for x in os.getenv(
