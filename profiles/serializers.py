@@ -7,6 +7,7 @@ class PerfilUsuarioSerializer(serializers.ModelSerializer):
     usuario_id = serializers.IntegerField(source="usuario.id", read_only=True)
     nombre = serializers.CharField(source="usuario.nombre", read_only=True)
     email = serializers.EmailField(source="usuario.email", read_only=True)
+    rol = serializers.CharField(source="usuario.rol.nombre", read_only=True)
 
     class Meta:
         model = PerfilUsuario
@@ -14,6 +15,7 @@ class PerfilUsuarioSerializer(serializers.ModelSerializer):
             "usuario_id",
             "nombre",
             "email",
+            "rol",
             "identificacion",
             "celular",
             "cargo",
